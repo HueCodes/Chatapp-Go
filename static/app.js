@@ -2,13 +2,14 @@ class ChatApp {
     constructor() {
         this.ws = null;
         this.username = '';
+        this.token = '';
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectInterval = 3000;
         
         this.initializeElements();
         this.setupEventListeners();
-        this.showUsernameModal();
+        this.checkAuth();
     }
 
     initializeElements() {
@@ -16,20 +17,29 @@ class ChatApp {
             messages: document.getElementById('messages'),
             messageInput: document.getElementById('messageInput'),
             sendButton: document.getElementById('sendButton'),
-            usernameModal: document.getElementById('usernameModal'),
-            usernameInput: document.getElementById('usernameInput'),
-            joinChatButton: document.getElementById('joinChat'),
+            authModal: document.getElementById('authModal'),
+            loginForm: document.getElementById('loginForm'),
+            registerForm: document.getElementById('registerForm'),
+            loginUsername: document.getElementById('loginUsername'),
+            loginPassword: document.getElementById('loginPassword'),
+            loginBtn: document.getElementById('loginBtn'),
+            registerUsername: document.getElementById('registerUsername'),
+            registerEmail: document.getElementById('registerEmail'),
+            registerPassword: document.getElementById('registerPassword'),
+            registerBtn: document.getElementById('registerBtn'),
+            showRegister: document.getElementById('showRegister'),
+            showLogin: document.getElementById('showLogin'),
+            authTitle: document.getElementById('authTitle'),
+            authError: document.getElementById('authError'),
             usernameDisplay: document.getElementById('username-display'),
-            changeUsernameButton: document.getElementById('change-username'),
+            logoutBtn: document.getElementById('logout-btn'),
             userCount: document.getElementById('userCount')
         };
     }
 
     setupEventListeners() {
-        // Send message on button click
         this.elements.sendButton.addEventListener('click', () => this.sendMessage());
         
-        // Send message on Enter key
         this.elements.messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -37,57 +47,181 @@ class ChatApp {
             }
         });
 
-        // Join chat button
-        this.elements.joinChatButton.addEventListener('click', () => this.joinChat());
+        this.elements.loginBtn.addEventListener('click', () => this.login());
+        this.elements.registerBtn.addEventListener('click', () => this.register());
         
-        // Username input enter key
-        this.elements.usernameInput.addEventListener('keypress', (e) => {
+        this.elements.showRegister.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showRegisterForm();
+        });
+        
+        this.elements.showLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showLoginForm();
+        });
+
+        this.elements.logoutBtn.addEventListener('click', () => this.logout());
+
+        this.elements.loginPassword.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                this.joinChat();
+                this.login();
             }
         });
 
-        // Change username button
-        this.elements.changeUsernameButton.addEventListener('click', () => {
-            this.disconnect();
-            this.showUsernameModal();
+        this.elements.registerPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.register();
+            }
         });
 
-        // Handle page visibility change for reconnection
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
-                this.connect();
+                if (this.token) {
+                    this.connect();
+                }
             }
         });
     }
 
-    showUsernameModal() {
-        this.elements.usernameModal.classList.add('show');
-        this.elements.usernameInput.focus();
-    }
-
-    hideUsernameModal() {
-        this.elements.usernameModal.classList.remove('show');
-    }
-
-    joinChat() {
-        const username = this.elements.usernameInput.value.trim();
+    checkAuth() {
+        const token = localStorage.getItem('token');
+        const username = localStorage.getItem('username');
         
-        if (!username) {
-            alert('Please enter a username');
+        if (token && username) {
+            this.token = token;
+            this.username = username;
+            this.elements.usernameDisplay.textContent = username;
+            this.elements.logoutBtn.style.display = 'inline-block';
+            this.hideAuthModal();
+            this.connect();
+        } else {
+            this.showAuthModal();
+        }
+    }
+
+    showAuthModal() {
+        this.elements.authModal.classList.add('show');
+        this.showLoginForm();
+    }
+
+    hideAuthModal() {
+        this.elements.authModal.classList.remove('show');
+    }
+
+    showLoginForm() {
+        this.elements.loginForm.style.display = 'block';
+        this.elements.registerForm.style.display = 'none';
+        this.elements.authTitle.textContent = 'Login';
+        this.elements.authError.textContent = '';
+        this.elements.loginUsername.focus();
+    }
+
+    showRegisterForm() {
+        this.elements.loginForm.style.display = 'none';
+        this.elements.registerForm.style.display = 'block';
+        this.elements.authTitle.textContent = 'Register';
+        this.elements.authError.textContent = '';
+        this.elements.registerUsername.focus();
+    }
+
+    async login() {
+        const username = this.elements.loginUsername.value.trim();
+        const password = this.elements.loginPassword.value;
+
+        if (!username || !password) {
+            this.showError('Please enter username and password');
             return;
         }
 
-        if (username.length > 20) {
-            alert('Username must be 20 characters or less');
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(error || 'Login failed');
+            }
+
+            const data = await response.json();
+            this.handleAuthSuccess(data);
+        } catch (error) {
+            this.showError(error.message);
+        }
+    }
+
+    async register() {
+        const username = this.elements.registerUsername.value.trim();
+        const email = this.elements.registerEmail.value.trim();
+        const password = this.elements.registerPassword.value;
+
+        if (!username || !email || !password) {
+            this.showError('Please fill in all fields');
             return;
         }
 
-        this.username = username;
-        this.elements.usernameDisplay.textContent = username;
-        this.hideUsernameModal();
+        if (password.length < 6) {
+            this.showError('Password must be at least 6 characters');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, email, password })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(error || 'Registration failed');
+            }
+
+            const data = await response.json();
+            this.handleAuthSuccess(data);
+        } catch (error) {
+            this.showError(error.message);
+        }
+    }
+
+    handleAuthSuccess(data) {
+        this.token = data.token;
+        this.username = data.username;
+        
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('username', data.username);
+        
+        this.elements.usernameDisplay.textContent = data.username;
+        this.elements.logoutBtn.style.display = 'inline-block';
+        this.hideAuthModal();
         this.connect();
+    }
+
+    logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        
+        this.disconnect();
+        this.token = '';
+        this.username = '';
+        
+        this.elements.usernameDisplay.textContent = '';
+        this.elements.logoutBtn.style.display = 'none';
+        this.elements.messages.innerHTML = '';
+        
+        this.showAuthModal();
+    }
+
+    showError(message) {
+        this.elements.authError.textContent = message;
     }
 
     connect() {
@@ -98,7 +232,7 @@ class ChatApp {
         this.showConnectionStatus('connecting', 'Connecting...');
         
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws?username=${encodeURIComponent(this.username)}`;
+        const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(this.token)}`;
         
         try {
             this.ws = new WebSocket(wsUrl);
@@ -117,13 +251,11 @@ class ChatApp {
             this.elements.messageInput.disabled = false;
             this.elements.sendButton.disabled = false;
             
-            // Hide connection status after 2 seconds
             setTimeout(() => this.hideConnectionStatus(), 2000);
         };
 
         this.ws.onmessage = (event) => {
             try {
-                // Handle multiple messages separated by newlines
                 const messages = event.data.split('\n').filter(msg => msg.trim());
                 messages.forEach(msgStr => {
                     const message = JSON.parse(msgStr);
@@ -220,7 +352,6 @@ class ChatApp {
                 <div class="message-content">${this.escapeHtml(message.content)}</div>
             `;
         } else {
-            // System messages (join/leave)
             messageDiv.innerHTML = `
                 <div class="message-content">${this.escapeHtml(message.content)}</div>
                 <div class="timestamp">${this.formatTimestamp(message.timestamp)}</div>
@@ -230,15 +361,11 @@ class ChatApp {
         this.elements.messages.appendChild(messageDiv);
         this.scrollToBottom();
         
-        // Update user count (simple estimation based on join/leave messages)
         this.updateUserCount(message);
     }
 
     updateUserCount(message) {
-        // This is a simple client-side estimation
-        // In a real app, you'd want the server to send the actual count
         if (message.type === 'user_join' || message.type === 'user_left') {
-            // For demo purposes, we'll show a static message
             this.elements.userCount.textContent = 'Users online';
         }
     }
@@ -280,7 +407,6 @@ class ChatApp {
     }
 }
 
-// Initialize the chat app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     new ChatApp();
 });

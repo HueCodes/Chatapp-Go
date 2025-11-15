@@ -12,7 +12,7 @@
             <h1>Go Chat App</h1>
             <div class="user-info">
                 <span id="username-display"></span>
-                <button id="change-username">Change Username</button>
+                <button id="logout-btn" style="display: none;">Logout</button>
             </div>
         </div>
         
@@ -29,12 +29,26 @@
         </div>
     </div>
 
-    <!-- Username Modal -->
-    <div id="usernameModal" class="modal">
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal">
         <div class="modal-content">
-            <h2>Enter Your Username</h2>
-            <input type="text" id="usernameInput" placeholder="Your username..." maxlength="20">
-            <button id="joinChat">Join Chat</button>
+            <h2 id="authTitle">Login</h2>
+            <div id="authError" class="error-message"></div>
+            
+            <div id="loginForm">
+                <input type="text" id="loginUsername" placeholder="Username" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <button id="loginBtn">Login</button>
+                <p class="toggle-auth">Don't have an account? <a href="#" id="showRegister">Register</a></p>
+            </div>
+
+            <div id="registerForm" style="display: none;">
+                <input type="text" id="registerUsername" placeholder="Username" required>
+                <input type="email" id="registerEmail" placeholder="Email" required>
+                <input type="password" id="registerPassword" placeholder="Password (min 6 chars)" required>
+                <button id="registerBtn">Register</button>
+                <p class="toggle-auth">Already have an account? <a href="#" id="showLogin">Login</a></p>
+            </div>
         </div>
     </div>
 

@@ -238,6 +238,7 @@ body {
 }
 
 .modal-content button {
+    width: 100%;
     background: #3498db;
     color: white;
     border: none;
@@ -247,6 +248,7 @@ body {
     font-size: 1rem;
     font-weight: 600;
     transition: background-color 0.3s;
+    margin-bottom: 1rem;
 }
 
 .modal-content button:hover {
@@ -256,6 +258,32 @@ body {
 .modal-content button:disabled {
     background: #bdc3c7;
     cursor: not-allowed;
+}
+
+.toggle-auth {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.toggle-auth a {
+    color: #3498db;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.toggle-auth a:hover {
+    text-decoration: underline;
+}
+
+.error-message {
+    color: #e74c3c;
+    background: #fadbd8;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    min-height: 1rem;
 }
 
 /* Connection status */

@@ -40,6 +40,7 @@ type Client struct {
 	conn     *websocket.Conn
 	send     chan []byte
 	username string
+	userID   string
 }
 
 // readPump pumps messages from the websocket connection to the hub

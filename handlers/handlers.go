@@ -3,6 +3,9 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strings"
+
+	"chatapp/auth"
 )
 
 // HomeHandler serves the main chat page
@@ -15,9 +18,24 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 // WSHandler handles websocket requests from the peer
 func WSHandler(hub *Hub) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		username := r.URL.Query().Get("username")
-		if username == "" {
-			http.Error(w, "Username is required", http.StatusBadRequest)
+		// Get token from query parameter or Authorization header
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				token = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+		}
+
+		if token == "" {
+			http.Error(w, "Authentication token is required", http.StatusUnauthorized)
+			return
+		}
+
+		// Validate token
+		claims, err := auth.ValidateToken(token)
+		if err != nil {
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 
@@ -31,7 +49,8 @@ func WSHandler(hub *Hub) http.HandlerFunc {
 			hub:      hub,
 			conn:     conn,
 			send:     make(chan []byte, 256),
-			username: username,
+			username: claims.Username,
+			userID:   claims.UserID,
 		}
 
 		client.hub.register <- client

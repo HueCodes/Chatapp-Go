@@ -12,10 +12,11 @@ Key principles include simplicity in architecture, robust error handling, and mo
 ## Features
 
 - **Real-Time Messaging**: Supports instant message delivery using WebSockets for low-latency communication.
-- **User Authentication**: Basic JWT-based authentication to manage user sessions securely.
-- **Room Management**: Create and join chat rooms for group conversations.
+- **User Authentication**: JWT-based authentication for secure user registration and login.
+- **Protected WebSocket Connections**: All WebSocket connections require valid JWT tokens.
 - **Message Persistence**: Optional integration with a database (e.g., SQLite) for storing chat history.
 - **Concurrent Handling**: Utilizes Go's goroutines and channels for efficient multi-user support.
+- **In-Memory User Store**: Simple user storage (easily replaceable with database backend).
 
 ## Prerequisites
 
@@ -42,16 +43,16 @@ Key principles include simplicity in architecture, robust error handling, and mo
    go build -o chatapp cmd/server/main.go
    ```
 
-4. **Set Up Environment** (Optional for Database):
-   Create a `.env` file in the root directory and add your database configuration:
-   ```
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_USER=youruser
-   DB_PASSWORD=yourpassword
-   DB_NAME=chatapp
-   JWT_SECRET=your_jwt_secret_key
-   ```
+4. **Set Up Environment** (Optional):
+    Create a `.env` file in the root directory and add your configuration:
+    ```
+    JWT_SECRET=your-super-secret-key-change-in-production
+    DB_HOST=localhost
+    DB_PORT=5432
+    DB_USER=youruser
+    DB_PASSWORD=yourpassword
+    DB_NAME=chatapp
+    ```
 
 ## Usage
 
@@ -62,40 +63,45 @@ Key principles include simplicity in architecture, robust error handling, and mo
    The server will start on `http://localhost:8080`.
 
 2. **Access the Chat Interface**:
-   Open your browser and navigate to `http://localhost:8080`. Register or log in to start chatting.
+    Open your browser and navigate to `http://localhost:8080`. You'll be prompted to register or login before you can start chatting.
 
-3. **API Endpoints** (for custom clients):
-   - `POST /register` - User registration
-   - `POST /login` - User login
-   - `GET /ws` - WebSocket upgrade for real-time chat
+3. **API Endpoints**:
+    - `POST /api/register` - User registration (username, email, password)
+    - `POST /api/login` - User login (username, password)
+    - `GET /ws` - WebSocket upgrade for real-time chat (requires JWT token)
 
-For detailed API documentation, refer to the [API docs](docs/api.md) or generate them using tools like Swagger.
+For detailed authentication documentation, see [AUTH.md](AUTH.md).
 
 Example WebSocket connection in JavaScript:
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws?token=your_jwt_token');
+// First, get a token by logging in
+const loginResponse = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'youruser', password: 'yourpass' })
+});
+const { token } = await loginResponse.json();
+
+// Then connect to WebSocket with the token
+const ws = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
 ws.onopen = () => console.log('Connected');
 ws.onmessage = (event) => console.log('Message:', event.data);
-ws.send(JSON.stringify({type: 'message', content: 'Hello, world!'}));
+ws.send(JSON.stringify({type: 'text', content: 'Hello, world!'}));
 ```
 
 ## Project Structure
 
 ```
 Chatapp-Go/
-├── cmd/
-│   └── server/
-│       └── main.go          # Entry point for the server
-├── internal/
-│   ├── auth/                # Authentication logic
-│   ├── handlers/            # HTTP and WebSocket handlers
-│   ├── models/              # Data models
-│   └── services/            # Business logic services
-├── pkg/
-│   └── websocket/           # WebSocket utilities
-├── docs/                    # Documentation
+├── auth/                    # Authentication logic (JWT, password hashing)
+├── handlers/                # HTTP and WebSocket handlers
+├── models/                  # Data models (User, Message)
+├── static/                  # Frontend files (HTML, CSS, JS)
+├── store/                   # User storage (in-memory, easily replaceable)
 ├── go.mod                   # Go modules
 ├── go.sum                   # Dependency checksums
+├── main.go                  # Entry point for the server
+├── AUTH.md                  # Authentication documentation
 └── README.md                # This file
 ```
 
