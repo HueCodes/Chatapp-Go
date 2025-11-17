@@ -53,7 +53,13 @@ coverage/
 build/
 dist/
 bin/
+chatapp
 
 # Temporary files
 tmp/
 temp/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
