@@ -41,6 +41,12 @@ type Client struct {
 	send     chan []byte
 	username string
 	userID   string
+	roomID   uint
+}
+
+// clientID returns a unique identifier for the client
+func (c *Client) clientID() string {
+	return c.userID + "-" + c.username
 }
 
 // readPump pumps messages from the websocket connection to the hub
@@ -66,25 +72,62 @@ func (c *Client) readPump() {
 			break
 		}
 
+		var rawMessage map[string]interface{}
+		if err := json.Unmarshal(messageBytes, &rawMessage); err != nil {
+			log.Printf("Error unmarshaling message: %v", err)
+			continue
+		}
+
+		// Check message type
+		msgType, ok := rawMessage["type"].(string)
+		if !ok {
+			msgType = "text"
+		}
+
+		// Handle typing indicators
+		if msgType == "typing" {
+			isTyping := false
+			if isTypingVal, ok := rawMessage["is_typing"].(bool); ok {
+				isTyping = isTypingVal
+			}
+
+			indicator := &models.TypingIndicator{
+				Type:     models.TypingMessage,
+				UserID:   c.userID,
+				Username: c.username,
+				RoomID:   c.roomID,
+				IsTyping: isTyping,
+			}
+
+			select {
+			case c.hub.typingIndicator <- indicator:
+			default:
+				// Channel full, skip
+			}
+			continue
+		}
+
+		// Handle regular text messages
 		var message models.Message
 		if err := json.Unmarshal(messageBytes, &message); err != nil {
 			log.Printf("Error unmarshaling message: %v", err)
 			continue
 		}
 
-		// Set the username from the client
+		// Set message properties from the client
+		message.UserID = c.userID
 		message.Username = c.username
+		message.RoomID = c.roomID
 		message.Type = models.TextMessage
+		message.Timestamp = time.Now()
 
-		// Re-marshal the message and send to broadcast
-		messageBytes, err = json.Marshal(message)
-		if err != nil {
-			log.Printf("Error marshaling message: %v", err)
-			continue
+		broadcastMsg := &BroadcastMessage{
+			Message: message,
+			RoomID:  c.roomID,
 		}
 
 		select {
-		case c.hub.broadcast <- messageBytes:
+		case c.hub.broadcast <- broadcastMsg:
 		default:
 			close(c.send)
 			return

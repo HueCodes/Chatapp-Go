@@ -3,9 +3,11 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"chatapp/auth"
+	"chatapp/store"
 )
 
 // HomeHandler serves the main chat page
@@ -16,7 +18,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // WSHandler handles websocket requests from the peer
-func WSHandler(hub *Hub) http.HandlerFunc {
+func WSHandler(hub *Hub, roomStore *store.RoomStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get token from query parameter or Authorization header
 		token := r.URL.Query().Get("token")
@@ -39,6 +41,25 @@ func WSHandler(hub *Hub) http.HandlerFunc {
 			return
 		}
 
+		// Get room_id from query parameter (default to 1)
+		roomIDStr := r.URL.Query().Get("room_id")
+		roomID := uint(1)
+		if roomIDStr != "" {
+			parsed, err := strconv.ParseUint(roomIDStr, 10, 32)
+			if err != nil {
+				http.Error(w, "Invalid room_id", http.StatusBadRequest)
+				return
+			}
+			roomID = uint(parsed)
+		}
+
+		// Validate room exists
+		_, err = roomStore.GetRoom(roomID)
+		if err != nil {
+			http.Error(w, "Room not found", http.StatusNotFound)
+			return
+		}
+
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println(err)
@@ -51,6 +72,7 @@ func WSHandler(hub *Hub) http.HandlerFunc {
 			send:     make(chan []byte, 256),
 			username: claims.Username,
 			userID:   claims.UserID,
+			roomID:   roomID,
 		}
 
 		client.hub.register <- client
